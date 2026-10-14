@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buscador de jugadores de ajedrez</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>♞</text></svg>">
+<style>
+  :root {
+    --fondo:#eef0f3; --panel:#ffffff; --panel2:#f6f7f9; --tinta:#1a1d21; --suave:#667085;
+    --borde:#d9dde3; --acento:#2f6f4f; --acento-tinta:#ffffff; --marca:#e7f2ec; --mal:#b3261e; --tic:#6b7684; --aviso-fondo:#fdecc8; --aviso-tinta:#7a4b00; --oro:#c8960c;
+    --sombra:0 1px 2px rgba(16,24,40,.06), 0 4px 14px rgba(16,24,40,.05);
+  }
+  [data-tema=oscuro] {
+    --fondo:#14171a; --panel:#1d2125; --panel2:#24292e; --tinta:#e8eaed; --suave:#98a2b3;
+    --borde:#333a41; --acento:#5fbf8f; --acento-tinta:#0f1512; --marca:#1f3329; --mal:#ff8a80; --tic:#aab4c0; --aviso-fondo:#4a3608; --aviso-tinta:#ffd88a; --oro:#e6b422;
+    --sombra:0 1px 2px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, "Segoe UI", sans-serif; background: var(--fondo); color: var(--tinta);
+         margin: 0; transition: background .2s, color .2s; }
+  main { max-width: 700px; margin: 0 auto; padding: 16px 16px 40px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+  header .logo { font-size: 1.9rem; line-height: 1; }
+  h1 { font-size: 1.4rem; margin: 0; flex: 1; letter-spacing: -.01em; }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  h3 { font-size: .76rem; text-transform: uppercase; letter-spacing: .06em; color: var(--suave); margin: 12px 0 7px; font-weight: 600; }
+  section { background: var(--panel); border: 1px solid var(--borde); border-radius: 12px;
+            padding: 13px 16px; margin-bottom: 12px; box-shadow: var(--sombra); }
+  form { display: flex; gap: 8px; }
+  input[type=text] { flex: 0 1 300px; min-width: 0; padding: 8px 12px; font-size: 1rem; color: var(--tinta);
+                     background: var(--panel2); border: 1px solid var(--borde); border-radius: 8px; }
+  input[type=text]:focus { outline: 2px solid var(--acento); outline-offset: 1px; }
+  button { padding: 9px 16px; font-size: .95rem; border: 1px solid var(--borde); border-radius: 8px;
+           background: var(--panel2); color: var(--tinta); cursor: pointer; font-family: inherit; }
+  button:hover:not(:disabled) { border-color: var(--acento); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.principal { background: var(--acento); border-color: var(--acento); color: var(--acento-tinta); font-weight: 600; }
+  #bTema { width: 40px; height: 40px; padding: 0; font-size: 1.15rem; border-radius: 50%; }
+  #estado { margin-top: 8px; font-size: .9rem; color: var(--suave); }
+  #estado:empty { display: none; }
+  #estado.mal { color: var(--mal); }
+  #jugador { margin-top: 10px; padding: 10px 13px; background: var(--marca); border-radius: 8px; border-left: 4px solid var(--acento); }
+  #jugador b { font-size: 1.1rem; }
+  #jugador span { color: var(--suave); font-size: .9rem; }
+  #jugador a { color: var(--acento); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+  .tabla-scroll { overflow-x: auto; margin-top: 10px; border: 1px solid var(--borde); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+  tr:last-child td { border-bottom: 0; }
+  th { color: var(--suave); font-weight: 600; font-size: .78rem; background: var(--panel2); }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--marca); }
+  tbody tr.activa { background: var(--marca); box-shadow: inset 3px 0 0 var(--acento); }
+
+  .rejilla { display: flex; flex-wrap: wrap; gap: 10px; }
+  .grupos { display: flex; flex-wrap: wrap; gap: 0 28px; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .dos section { margin-bottom: 12px; }
+  @media (max-width: 640px) { .dos { grid-template-columns: 1fr; gap: 0; } }
+  .tarjeta { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+             width: 108px; height: 82px; border: 1.5px solid var(--borde); border-radius: 10px;
+             background: var(--panel2); color: var(--tinta); text-decoration: none; font-size: .84rem;
+             cursor: pointer; user-select: none; transition: border-color .15s, background .15s, transform .1s; }
+  .tarjeta:hover { border-color: var(--acento); transform: translateY(-1px); }
+  .tarjeta img, .tarjeta .letra { width: 30px; height: 30px; border-radius: 7px; }
+  /* Placa clara detrás del icono: los logos oscuros se ven también en modo oscuro. */
+  .tarjeta img { background: #fff; padding: 3px; border: 1px solid var(--borde); object-fit: contain; }
+  .tarjeta .letra { display: flex; align-items: center; justify-content: center; background: var(--acento);
+                    color: var(--acento-tinta); font-weight: 700; font-size: 1.1rem; }
+  .tarjeta input { position: absolute; opacity: 0; pointer-events: none; }
+  .tarjeta .tic { position: absolute; top: 5px; right: 6px; width: 18px; height: 18px; border-radius: 50%;
+                  border: 2px solid var(--tic); display: flex; align-items: center; justify-content: center;
+                  font-size: .68rem; color: transparent; background: var(--panel); }
+  .tarjeta.marcada { border-color: var(--acento); background: var(--marca); }
+  .tarjeta.marcada .tic { background: var(--acento); border-color: var(--acento); color: var(--acento-tinta); }
+  .tarjeta:focus-within { outline: 2px solid var(--acento); outline-offset: 2px; }
+
+  .acciones { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  #aviso { font-size: .88rem; color: var(--suave); }
+  #jugador.autor { border-left-color: var(--oro); }
+  #jugador .etiqueta { display: inline-block; margin-left: 8px; padding: 1px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; vertical-align: middle; white-space: nowrap; }
+  #jugador .etiqueta.inactivo { background: var(--aviso-fondo); color: var(--aviso-tinta); }
+  #jugador .etiqueta.autor { background: var(--oro); color: #1a1400; }
+  h3 { position: relative; }
+  .ayuda { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 4px;
+           border: 1.5px solid var(--tic); border-radius: 50%; font-size: .68rem; letter-spacing: 0; cursor: help; color: var(--tinta); }
+  .globo { display: none; position: absolute; left: 0; top: 135%; z-index: 5; width: 230px; padding: 8px 10px;
+           background: var(--tinta); color: var(--panel); border-radius: 8px; font-size: .8rem; font-weight: 400;
+           text-transform: none; letter-spacing: 0; line-height: 1.35; box-shadow: var(--sombra); }
+  .ayuda:hover + .globo, .ayuda:focus + .globo { display: block; }
+  .globo.abierto { display: block; }
+  .coleccion { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 3px 0; }
+  .coleccion .nombre-col { font-weight: 600; min-width: 112px; }
+  .coleccion button { padding: 6px 12px; font-size: .88rem; }
+  #bloqueados { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  #bloqueados a { padding: 7px 13px; border: 1.5px solid var(--acento); border-radius: 999px; color: var(--acento);
+                  text-decoration: none; font-weight: 600; font-size: .9rem; background: var(--panel2); }
+
+  /* ---------- móvil ---------- */
+  @media (max-width: 560px) {
+    main { padding: 12px 10px 32px; }
+    h1 { font-size: 1.12rem; }
+    header .logo { font-size: 1.5rem; }
+    section { padding: 12px; }
+    form { flex-wrap: wrap; }
+    input[type=text] { flex: 1 1 100%; padding: 10px 12px; }
+    form button { flex: 1; padding: 10px; }
+    .grupos > div { flex: 1 1 100%; }
+    .rejilla { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .tarjeta { width: auto; height: 78px; padding: 0 4px; text-align: center; line-height: 1.15; font-size: .8rem; }
+    #bAbrir { flex: 1 1 100%; padding: 12px; font-size: 1rem; }
+    .coleccion .nombre-col { flex: 1 1 100%; }
+    .coleccion button { flex: 1; padding: 9px 6px; }
+    .ayuda { width: 22px; height: 22px; font-size: .8rem; }
+    .globo { width: min(260px, 80vw); }
+    /* Lista de coincidencias: dos líneas por jugador en vez de tabla ancha. */
+    thead { display: none; }
+    table, tbody { display: block; }
+    tbody tr { display: flex; flex-wrap: wrap; gap: 1px 10px; padding: 9px 11px; border-bottom: 1px solid var(--borde); }
+    tbody tr:last-child { border-bottom: 0; }
+    tbody td { padding: 0; border: 0; font-size: .82rem; color: var(--suave); }
+    tbody td:empty { display: none; }
+    tbody td.n { flex: 1 1 100%; font-size: .98rem; font-weight: 600; color: var(--tinta); white-space: normal; }
+    tbody td[data-e]::before { content: attr(data-e) ' '; }
+  }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <span class="logo">♞</span>
+  <h1>Buscador de jugadores de ajedrez</h1>
+  <button id="bTema" title="Cambiar a modo oscuro o claro" aria-label="Cambiar tema">🌙</button>
+</header>
+
+<section>
+  <h2>Búsqueda de jugador</h2>
+  <form id="f">
+    <input type="text" id="q" placeholder="Nombre o ID FIDE" autocomplete="off" autofocus>
+    <button class="principal">Buscar</button>
+    <button type="button" id="bLimpiar">Limpiar</button>
+  </form>
+  <div id="estado"></div>
+
+  <div class="tabla-scroll" id="cajaResultados" hidden>
+    <table><thead><tr>
+      <th>Nombre</th><th>Fed.</th><th>Título</th><th>Año</th><th>Est.</th><th>Ráp.</th><th>Blitz</th><th>ID</th>
+    </tr></thead><tbody id="resultados"></tbody></table>
+  </div>
+
+  <div id="jugador" hidden></div>
+
+  <div class="grupos">
+    <div><h3>Sitios principales</h3><div class="rejilla" id="gPrincipal"></div></div>
+    <div><h3>Sitios alternativos <span class="ayuda" tabindex="0" aria-label="Ayuda">?</span><span class="globo">Abren el buscador del sitio. El nombre queda copiado: pégalo en su caja de búsqueda.</span></h3><div class="rejilla" id="gAlternativo"></div></div>
+  </div>
+  <div id="colecciones"></div>
+
+  <div class="acciones">
+    <button class="principal" id="bAbrir" disabled>Abrir marcados</button>
+    <span id="aviso">Busca un jugador para activar el botón.</span>
+  </div>
+  <div id="bloqueados" hidden></div>
+</section>
+
+<div class="dos">
+  <section>
+    <h2>Bases de datos online</h2>
+    <div class="rejilla" id="gBases"></div>
+  </section>
+  <section>
+    <h2>Aperturas</h2>
+    <div class="rejilla" id="gAperturas"></div>
+  </section>
+</div>
+</main>
+
+<script>
+/* ============================================================
+   CONFIGURACIÓN — editar aquí para añadir, quitar o corregir.
+   icono: dirección de una imagen. Si se omite, se usa el icono
+          del dominio; si la imagen falla, se muestra la inicial.
+   ============================================================ */
+
+// Sitios de búsqueda de jugador.
+//   grupo 'principal'  : abre la ficha directa del jugador.
+//   grupo 'alternativo': abre el buscador del sitio (el nombre queda copiado).
+//   marcado            : valor inicial (luego se recuerda tu selección).
+//   necesita           : 'id' o 'nombre', dato imprescindible para el enlace.
+const SITIOS = [
+  { clave: 'stalker', nombre: 'Chess Stalker', dominio: 'chessstalker.com', grupo: 'principal', marcado: true, necesita: 'id',
+    url: j => 'https://chessstalker.com/fide/' + j.id },
+  { clave: 'yotta',   nombre: 'YottaChess',    dominio: 'yottachess.com',   grupo: 'principal', marcado: true, necesita: 'nombre',
+    url: j => 'https://www.yottachess.com/player/' +
+              encodeURIComponent(j.name.toLowerCase()).replace(/%2C/g, ',') },
+  { clave: 'ceo',     nombre: 'Chess.ceo',     dominio: 'chess.ceo',        grupo: 'principal', marcado: true, necesita: 'id',
+    icono: 'https://chess.ceo/images/chess_ceo_knight.png',
+    url: j => 'https://chess.ceo/player/' + j.id },
+  { clave: 'bazas',   nombre: 'Baza szachowa', dominio: 'bazaszachowa.smallhost.pl', grupo: 'principal', marcado: false, necesita: 'nombre',
+    url: j => 'https://bazaszachowa.smallhost.pl/player_data/' + encodeURIComponent(j.name) },
+  { clave: 'elocheck', nombre: 'EloCheck',     dominio: 'elocheck.com',     grupo: 'principal', marcado: false, necesita: 'nombre',
+    // Formato de ficha: apellido-nombre-IDFIDE (p. ej. carlsen-magnus-1503014)
+    url: j => 'https://elocheck.com/es/jugador/' +
+              normal(j.name).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + j.id },
+  { clave: 'corpus',  nombre: 'ChessCorpus',   dominio: 'chesscorpus.org',  grupo: 'alternativo', marcado: false,
+    url: () => 'https://chesscorpus.org/database/players' },
+  { clave: 'cbase',   nombre: 'ChessBase',     dominio: 'chessbase.com',    grupo: 'alternativo', marcado: false,
+    url: () => 'https://database.chessbase.com/' },
+];
+
+// Accesos directos (iconos). No usan el nombre del jugador.
+const BASES = [
+  { nombre: 'Chess.ceo', dominio: 'chess.ceo', icono: 'https://chess.ceo/images/chess_ceo_knight.png', url: 'https://chess.ceo/' },
+  { nombre: 'PGNBase',   dominio: 'pgnbase.com', url: 'https://www.pgnbase.com/' },
+];
+const APERTURAS = [
+  { nombre: 'Lichess análisis', dominio: 'lichess.org', url: 'https://lichess.org/analysis' },
+];
+
+// Colecciones de Chess.ceo. Su caja "Buscar partidas" acepta  white "Apellido, Nombre"  y  black "Apellido, Nombre",
+// pero no se puede rellenar desde fuera: se copia el filtro y se abre la colección para pegarlo.
+const COLECCIONES = [
+  { nombre: 'CampMundo26', url: 'https://chess.ceo/collection/f5daedec2e2bb429' },
+];
+
+// Huevos de pascua.
+const ID_AUTOR = 2202484;   // su ficha sale con corona
+const SECRETOS = [          // palabras que abren una web en vez de buscar un jugador
+  { palabras: ['lanzador', 'juegos'], nombre: 'el Lanzador', url: 'https://jcaselas-ship-it.github.io/lanzador3/' },
+];
+
+const API = 'https://lichess.org/api/fide/player';
+
+/* ---------- utilidades ---------- */
+const $ = id => document.getElementById(id);
+function leer(clave, porDefecto) {
+  try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : porDefecto; }
+  catch (e) { return porDefecto; }
+}
+function escribir(clave, valor) {
+  try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) {}
+}
+async function copiar(texto) {
+  try { await navigator.clipboard.writeText(texto); return true; }
+  catch (e) {
+    const t = document.createElement('textarea');
+    t.value = texto; document.body.appendChild(t); t.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e2) {}
+    t.remove(); return ok;
+  }
+}
+function ponerEstado(texto, mal) {
+  $('estado').textContent = texto;
+  $('estado').className = mal ? 'mal' : '';
+}
+function normal(t) { return t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(); }
+function td(texto) { const c = document.createElement('td'); c.textContent = texto ?? ''; return c; }
+
+// Imagen del sitio: icono propio -> icono del dominio -> inicial.
+function crearIcono(e) {
+  const letra = () => { const d = document.createElement('div'); d.className = 'letra'; d.textContent = e.nombre[0]; return d; };
+  const delDominio = 'https://www.google.com/s2/favicons?sz=64&domain=' + e.dominio;
+  const img = document.createElement('img');
+  img.alt = ''; img.src = e.icono || delDominio;
+  img.addEventListener('error', () => {
+    if (img.src !== delDominio) img.src = delDominio; else img.replaceWith(letra());
+  });
+  return img;
+}
+
+/* ---------- tema ---------- */
+function aplicarTema(t) {
+  document.documentElement.dataset.tema = t;
+  $('bTema').textContent = t === 'oscuro' ? '☀️' : '🌙';
+}
+let tema = leer('bj2_tema', null) ||
+           (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro');
+aplicarTema(tema);
+$('bTema').addEventListener('click', () => {
+  tema = tema === 'oscuro' ? 'claro' : 'oscuro';
+  aplicarTema(tema); escribir('bj2_tema', tema);
+});
+
+/* ---------- estado ---------- */
+let jugador = null;
+const TACTIL = !!(window.matchMedia && matchMedia('(hover: none)').matches);   // móvil o tableta
+let consultaElegida = null;
+let consultaLista = null;   // texto con el que se pintó la lista de coincidencias
+let filas = [];             // filas de la lista
+let sel = -1;               // fila resaltada
+const guardado = leer('bj2_marcados', {});
+const marcados = Object.fromEntries(SITIOS.map(s => [s.clave, s.clave in guardado ? guardado[s.clave] : s.marcado]));
+
+/* ---------- secciones fijas ---------- */
+function pintarSitios() {
+  SITIOS.forEach(s => {
+    const lab = document.createElement('label');
+    lab.className = 'tarjeta' + (marcados[s.clave] ? ' marcada' : '');
+    const chk = document.createElement('input');
+    chk.type = 'checkbox'; chk.checked = !!marcados[s.clave];
+    chk.addEventListener('change', () => {
+      marcados[s.clave] = chk.checked;
+      lab.classList.toggle('marcada', chk.checked);
+      escribir('bj2_marcados', marcados);
+    });
+    const tic = document.createElement('span'); tic.className = 'tic'; tic.textContent = '✓';
+    lab.append(chk, tic, crearIcono(s), document.createTextNode(s.nombre));
+    $(s.grupo === 'principal' ? 'gPrincipal' : 'gAlternativo').appendChild(lab);
+  });
+}
+function pintarAccesos(lista, cajaId) {
+  lista.forEach(e => {
+    const a = document.createElement('a');
+    a.className = 'tarjeta'; a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
+    a.append(crearIcono(e), document.createTextNode(e.nombre));
+    $(cajaId).appendChild(a);
+  });
+}
+pintarSitios();
+pintarAccesos(BASES, 'gBases');
+pintarAccesos(APERTURAS, 'gAperturas');
+
+/* ---------- colecciones de Chess.ceo ---------- */
+function pintarColecciones() {
+  const caja = $('colecciones');
+  if (!COLECCIONES.length) return;
+  const h = document.createElement('h3');
+  h.innerHTML = 'Colecciones Chess.ceo <span class="ayuda" tabindex="0" aria-label="Ayuda">?</span>' +
+    '<span class="globo">Copia el filtro del jugador y abre la colección. En Chess.ceo, pégalo en «Buscar partidas…» y pulsa Enter.</span>';
+  caja.appendChild(h);
+  COLECCIONES.forEach(c => {
+    const fila = document.createElement('div'); fila.className = 'coleccion';
+    const n = document.createElement('span'); n.className = 'nombre-col'; n.textContent = c.nombre;
+    fila.appendChild(n);
+    [['white', '♔ Blancas'], ['black', '♚ Negras'], ['', 'Ambos']].forEach(([color, texto]) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'bColeccion';
+      b.textContent = texto; b.disabled = true;
+      b.addEventListener('click', () => abrirColeccion(c, color));
+      fila.appendChild(b);
+    });
+    caja.appendChild(fila);
+  });
+}
+function actualizarColecciones() {
+  const ok = !!(jugador && jugador.name);
+  document.querySelectorAll('.bColeccion').forEach(b => b.disabled = !ok);
+}
+async function abrirColeccion(c, color) {
+  if (!jugador || !jugador.name) return;
+  const filtro = color ? color + ' "' + jugador.name + '"' : jugador.name;
+  const copiado = await copiar(filtro);
+  const w = window.open(c.url, '_blank');
+  if (w) { try { w.opener = null; } catch (e) {} pintarBloqueados([]); }
+  else pintarBloqueados([[c.nombre, c.url]]);
+  $('aviso').textContent = copiado
+    ? 'Copiado: ' + filtro + ' — en ' + c.nombre + ', pégalo en «Buscar partidas…» y pulsa Enter.'
+    : 'No se pudo copiar. Escribe en «Buscar partidas…»: ' + filtro;
+}
+pintarColecciones();
+
+/* ---------- búsqueda ---------- */
+$('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('q').value.trim();
+  if (!q) return;
+  // Palabra secreta: abre su web en vez de buscar.
+  const secreto = SECRETOS.find(s => s.palabras.includes(normal(q)));
+  if (secreto) { window.open(secreto.url, '_blank', 'noopener'); ponerEstado('🚀 Abriendo ' + secreto.nombre + '…'); return; }
+  // Lista a la vista y mismo texto: Enter elige la fila resaltada.
+  if (!$('cajaResultados').hidden && q === consultaLista && filas[sel]) { filas[sel].click(); return; }
+  // Segundo Enter con el mismo texto y un jugador ya elegido: abre los marcados.
+  if (jugador && q === consultaElegida) { abrirMarcados(); return; }
+  const esId = /^\d+$/.test(q);
+  ponerEstado('Buscando…');
+  $('cajaResultados').hidden = true;
+  try {
+    const r = await fetch(esId ? API + '/' + q : API + '?q=' + encodeURIComponent(q),
+                          { headers: { Accept: 'application/json' } });
+    if (r.status === 404) { ponerEstado('No hay ningún jugador con ese ID.', true); return; }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const datos = await r.json();
+    const lista = Array.isArray(datos) ? datos : [datos];
+    if (!lista.length) { ponerEstado('Sin coincidencias. Prueba con el apellido solo.', true); return; }
+    if (lista.length === 1) { ponerEstado(''); elegir(lista[0]); return; }
+    ponerEstado(lista.length + (TACTIL ? ' coincidencias: toca un jugador.' : ' coincidencias: elige con ↑ ↓ y Enter, o pulsa una fila.'));
+    pintarResultados(lista);
+  } catch (err) {
+    if (esId) {
+      ponerEstado('No se pudo consultar Lichess (' + err.message + '). Uso solo el ID; YottaChess necesita el nombre.', true);
+      elegir({ id: Number(q), name: '' });
+    } else {
+      ponerEstado('No se pudo consultar Lichess (' + err.message + '). Prueba con el ID FIDE.', true);
+    }
+  }
+});
+
+function pintarResultados(lista) {
+  const cuerpo = $('resultados');
+  cuerpo.innerHTML = '';
+  lista.forEach(j => {
+    const tr = document.createElement('tr');
+    // [valor, etiqueta para la vista de móvil]
+    [[j.name], [j.federation], [j.title], [j.year, 'n.'], [j.standard, 'Est.'], [j.rapid, 'Ráp.'], [j.blitz, 'Blitz'], [j.id, 'ID']]
+      .forEach(([v, etq], i) => { const c = td(v); if (i === 0) c.className = 'n'; if (etq) c.dataset.e = etq; tr.appendChild(c); });
+    tr.addEventListener('click', () => { $('cajaResultados').hidden = true; ponerEstado(''); elegir(j); });
+    cuerpo.appendChild(tr);
+  });
+  filas = [...cuerpo.children];
+  consultaLista = $('q').value.trim();
+  $('cajaResultados').hidden = false;
+  resaltar(0);
+}
+function resaltar(i) {
+  if (!filas.length) return;
+  sel = (i + filas.length) % filas.length;
+  filas.forEach((f, n) => f.classList.toggle('activa', n === sel));
+  filas[sel].scrollIntoView({ block: 'nearest' });
+}
+
+/* ---------- teclado ---------- */
+$('q').addEventListener('keydown', e => {
+  if ($('cajaResultados').hidden) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); resaltar(sel + 1); }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); resaltar(sel - 1); }
+});
+// "/" o Esc llevan a la caja de búsqueda con el texto seleccionado.
+document.addEventListener('keydown', e => {
+  const enCaja = document.activeElement === $('q');
+  if (e.key === 'Escape' || (e.key === '/' && !enCaja)) { e.preventDefault(); $('q').focus(); $('q').select(); }
+});
+
+$('bLimpiar').addEventListener('click', () => {
+  jugador = null; consultaElegida = null; consultaLista = null; filas = []; sel = -1;
+  $('q').value = '';
+  $('cajaResultados').hidden = true;
+  $('jugador').hidden = true;
+  $('bAbrir').disabled = true;
+  pintarBloqueados([]);
+  actualizarColecciones();
+  ponerEstado('');
+  $('aviso').textContent = 'Busca un jugador para activar el botón.';
+  $('q').focus();
+});
+
+function elegir(j) {
+  jugador = j;
+  consultaElegida = $('q').value.trim();
+  const caja = $('jugador');
+  caja.innerHTML = '';
+  const b = document.createElement('b');
+  const esAutor = Number(j.id) === ID_AUTOR;
+  caja.classList.toggle('autor', esAutor);
+  b.textContent = (esAutor ? '👑 ' : '') + (j.title ? j.title + ' ' : '') + (j.name || 'ID ' + j.id);
+  const datos = [];
+  if (j.federation) datos.push(j.federation);
+  if (j.year) datos.push('n. ' + j.year);
+  // El ID enlaza a la ficha oficial de FIDE.
+  const fide = document.createElement('a');
+  fide.href = 'https://ratings.fide.com/profile/' + j.id;
+  fide.target = '_blank'; fide.rel = 'noopener';
+  fide.title = 'Abrir la ficha oficial en FIDE';
+  fide.textContent = 'ID ' + j.id;
+  datos.push(fide);
+  const elos = [['Est.', j.standard], ['Ráp.', j.rapid], ['Blitz', j.blitz]].filter(e => e[1]).map(e => e[0] + ' ' + e[1]);
+  if (elos.length) datos.push(elos.join(' / '));
+  const s = document.createElement('span');
+  s.append('  ');
+  datos.forEach((d, i) => { if (i) s.append(' · '); s.append(d); });
+  caja.append(b, s);
+  const etiqueta = (clase, texto) => { const e = document.createElement('span'); e.className = 'etiqueta ' + clase; e.textContent = texto; caja.append(e); };
+  if (j.inactive) etiqueta('inactivo', 'Inactivo');
+  if (esAutor) etiqueta('autor', 'El autor de este buscador');
+  caja.hidden = false;
+  $('bAbrir').disabled = false;
+  actualizarColecciones();
+  pintarBloqueados([]);
+  $('aviso').textContent = TACTIL ? '' : 'Pulsa Enter otra vez o "Abrir marcados".';
+  // En táctil se suelta la caja para que el teclado no tape los sitios.
+  if (TACTIL) $('q').blur(); else $('q').focus();
+}
+
+/* ---------- abrir marcados ---------- */
+function pintarBloqueados(lista) {
+  const caja = $('bloqueados');
+  caja.innerHTML = '';
+  lista.forEach(([nombre, u]) => {
+    const a = document.createElement('a');
+    a.href = u; a.target = '_blank'; a.rel = 'noopener'; a.textContent = nombre + ' ↗';
+    caja.appendChild(a);
+  });
+  caja.hidden = !lista.length;
+}
+// La ayuda "?" también se abre y cierra al tocar.
+document.addEventListener('click', e => {
+  document.querySelectorAll('.globo').forEach(g => {
+    const suya = e.target.classList && e.target.classList.contains('ayuda') && e.target.nextElementSibling === g;
+    g.classList.toggle('abierto', suya && !g.classList.contains('abierto'));
+  });
+});
+$('bAbrir').addEventListener('click', abrirMarcados);
+async function abrirMarcados() {
+  if (!jugador) return;
+  const elegidos = SITIOS.filter(s => marcados[s.clave]);
+  if (!elegidos.length) { $('aviso').textContent = 'No hay ningún sitio marcado.'; return; }
+  const avisos = [];
+  const abribles = elegidos.filter(s => {
+    const falta = s.necesita === 'nombre' ? !jugador.name : s.necesita === 'id' ? !jugador.id : false;
+    if (falta) avisos.push(s.nombre + ' omitido (falta el ' + s.necesita + ').');
+    return !falta;
+  });
+  if (jugador.name && abribles.some(s => s.grupo === 'alternativo')) {
+    avisos.push((await copiar(jugador.name)) ? 'Nombre copiado para pegar.' : 'No se pudo copiar el nombre.');
+  }
+  // Si el navegador bloquea alguna pestaña (habitual en móvil), se ofrece como enlace directo.
+  const bloqueados = [];
+  abribles.forEach(s => {
+    const u = s.url(jugador);
+    const w = window.open(u, '_blank');
+    if (w) { try { w.opener = null; } catch (e) {} } else bloqueados.push([s.nombre, u]);
+  });
+  pintarBloqueados(bloqueados);
+  if (bloqueados.length) avisos.push('El navegador bloqueó ' + bloqueados.length + (bloqueados.length > 1 ? ' pestañas: ábrelas' : ' pestaña: ábrela') + ' desde estos enlaces.');
+  $('aviso').textContent = avisos.join(' ');
+}
+</script>
+</body>
+</html>
